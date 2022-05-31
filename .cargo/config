@@ -1,0 +1,8 @@
+[target.riscv32imac-unknown-none-elf]
+runner = "qemu-system-riscv32 -nographic -machine virt -d in_asm -bios none -kernel"
+rustflags = [
+  "-C", "link-arg=-Tlinker.ld",
+]
+
+[build]
+target = "riscv32imac-unknown-none-elf"
