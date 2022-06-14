@@ -1,17 +1,19 @@
 #![no_std]
 #![no_main]
 
+mod uart;
+
 use core::arch;
+use core::fmt::Write;
 use core::panic::PanicInfo;
-use core::ptr;
+use uart::Uart;
 
 arch::global_asm!(include_str!("../boot.s"));
 
 #[no_mangle]
 pub extern "C" fn __start_rust() -> ! {
-    for c in b"Hello World\n" {
-        unsafe { ptr::write_volatile(0x10000000 as *mut u8, *c) };
-    }
+    let mut uart = Uart::new();
+    writeln!(&mut uart, "Hello World").unwrap();
 
     loop {}
 }
