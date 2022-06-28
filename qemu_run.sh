@@ -21,7 +21,7 @@ qemu-system-x86_64 \
     -machine q35,accel=kvm:tcg \
     -nographic \
     -m 128M \
+    -serial stdio \
     -drive if=pflash,format=raw,file=$OVMF_CODE,readonly=on \
     -drive if=pflash,format=raw,file=$OVMF_VARS,readonly=on \
     -drive format=raw,file=fat:rw:$DISK_DIR \
-    -serial stdio \
