@@ -16,8 +16,9 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     unsafe {
         let mut volume = (*fs.interface.get()).open_volume().unwrap();
 
-        let mut buf = [0; 7];
-        let kernel_filename = CStr16::from_str_with_buf("kernel", &mut buf).unwrap();
+        let mut kernel_filename_buffer = [0; 7];
+        let kernel_filename =
+            CStr16::from_str_with_buf("kernel", &mut kernel_filename_buffer).unwrap();
 
         let handle = volume
             .open(kernel_filename, FileMode::Read, FileAttribute::READ_ONLY)
