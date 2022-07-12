@@ -7,3 +7,6 @@ target = "x86_64-unknown-uefi"
 
 [target.'cfg(all(target_arch = "x86_64", target_os = "uefi"))']
 runner = "./qemu_run.sh"
+
+[target.'cfg(all(target_arch = "x86_64", target_os = "none"))']
+rustflags = ["-Cno-redzone=n", "-Clink-args=--entry kernel_main -z norelro --image-base 0x100000"]

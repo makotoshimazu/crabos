@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+// #![feature(abi_efiapi)]
 
 use core::ffi::c_void;
 use core::panic::PanicInfo;
@@ -13,11 +14,14 @@ pub struct EfiTableHeader {
     _reserved: u32,
 }
 
-
 #[repr(C)]
 pub struct EfiSimpleTextOutputProtocol {
-    pub reset: unsafe extern "win64" fn(this: &EfiSimpleTextOutputProtocol, extended: bool) -> EfiStatus,
-    pub output_string: unsafe extern "win64" fn(this: &EfiSimpleTextOutputProtocol, string: *const u16) -> EfiStatus,
+    pub reset:
+        unsafe extern "win64" fn(this: &EfiSimpleTextOutputProtocol, extended: bool) -> EfiStatus,
+    pub output_string: unsafe extern "win64" fn(
+        this: &EfiSimpleTextOutputProtocol,
+        string: *const u16,
+    ) -> EfiStatus,
     // TBD
 }
 
@@ -31,7 +35,7 @@ pub struct EfiSystemTable {
     pub console_out_handle: EfiHandle,
     pub con_out: *mut EfiSimpleTextOutputProtocol,
     pub standard_error_handle: EfiHandle,
-    _std_err: usize,// TBD
+    _std_err: usize, // TBD
 }
 
 #[derive(Clone, Copy)]
@@ -65,3 +69,12 @@ pub extern "C" fn efi_main(image: EfiHandle, st: EfiSystemTable) -> EfiStatus {
 fn panic(_panic: &PanicInfo<'_>) -> ! {
     loop {}
 }
+
+// use uefi::prelude::*;
+
+// #[entry]
+// fn main(_handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
+//     uefi_services::init(&mut system_table).unwrap();
+
+//     Status::SUCCESS
+// }
