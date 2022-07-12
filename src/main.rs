@@ -1,67 +1,34 @@
 #![no_std]
 #![no_main]
+#![feature(abi_efiapi)]
+use uefi::prelude::*;
+use uefi::proto::media::file::{File, FileAttribute, FileMode};
+use uefi::CStr16;
 
-use core::ffi::c_void;
-use core::panic::PanicInfo;
+#[entry]
+fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
+    uefi_services::init(&mut system_table).unwrap();
 
-#[repr(C)]
-pub struct EfiTableHeader {
-    pub signature: u64,
-    pub revision: u32,
-    pub header_size: u32,
-    pub crc32: u32,
-    _reserved: u32,
-}
-
-
-#[repr(C)]
-pub struct EfiSimpleTextOutputProtocol {
-    pub reset: unsafe extern "win64" fn(this: &EfiSimpleTextOutputProtocol, extended: bool) -> EfiStatus,
-    pub output_string: unsafe extern "win64" fn(this: &EfiSimpleTextOutputProtocol, string: *const u16) -> EfiStatus,
-    // TBD
-}
-
-#[repr(C)]
-pub struct EfiSystemTable {
-    pub header: EfiTableHeader,
-    pub firmware_vendor: *const u16,
-    pub firmware_revision: u32,
-    pub console_in_handle: EfiHandle,
-    _con_in: usize,
-    pub console_out_handle: EfiHandle,
-    pub con_out: *mut EfiSimpleTextOutputProtocol,
-    pub standard_error_handle: EfiHandle,
-    _std_err: usize,// TBD
-}
-
-#[derive(Clone, Copy)]
-#[repr(transparent)]
-pub struct EfiHandle(*mut c_void);
-
-#[repr(usize)]
-pub enum EfiStatus {
-    SUCCESS = 0,
-}
-
-#[no_mangle]
-pub extern "C" fn efi_main(image: EfiHandle, st: EfiSystemTable) -> EfiStatus {
-    let stdout: &mut EfiSimpleTextOutputProtocol = unsafe { &mut *(st.con_out) };
-    let string = "hello world".as_bytes();
-    let mut buf = [0u16; 32];
-
-    for i in 0..string.len() {
-        buf[i] = string[i] as u16;
-    }
-
+    let fs = system_table
+        .boot_services()
+        .get_image_file_system(handle)
+        .unwrap();
     unsafe {
-        (stdout.reset)(stdout, false);
-        (stdout.output_string)(stdout, buf.as_ptr());
-    }
-    loop {}
-    EfiStatus::SUCCESS
-}
+        let mut volume = (*fs.interface.get()).open_volume().unwrap();
 
-#[panic_handler]
-fn panic(_panic: &PanicInfo<'_>) -> ! {
-    loop {}
+        let mut buf = [0; 4];
+        let kernel_filename = CStr16::from_str_with_buf("kernel", &mut buf).unwrap();
+
+        let handle = volume
+            .open(kernel_filename, FileMode::Read, FileAttribute::READ_ONLY)
+            .unwrap();
+        let mut file = handle.into_regular_file().unwrap();
+        // TODO: allocate enough memory
+        let mut buffer = [0; 10000];
+        let _nbytes = file.read(&mut buffer).unwrap();
+
+        // TODO: Move the instruction pointer to the address stored at (buffer + 24).
+    }
+
+    Status::SUCCESS
 }
