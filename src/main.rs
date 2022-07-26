@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 #![feature(abi_efiapi)]
-use core::clone;
 use core::fmt::Write;
 use core::slice::from_raw_parts_mut;
 use uefi::prelude::*;
