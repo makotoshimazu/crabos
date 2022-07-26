@@ -2,7 +2,8 @@
 
 set -eu
 
-script_dir=$(cd $(dirname $0); pwd)
+readonly SCRIPT_DIR=$(cd $(dirname $0); pwd)
+cd $SCRIPT_DIR
 
 readonly KERNEL_TARGET=x86_64-unknown-none
 readonly PROFILE=${1:-debug}
@@ -17,6 +18,6 @@ fi
 # kernel build
 cargo build ${CARGO_PROFILE} --bin kernel --target ${KERNEL_TARGET}
 # copy binary into disk
-cp ${script_dir}/target/${KERNEL_TARGET}/${PROFILE}/kernel ${script_dir}/disk/kernel
+cp target/${KERNEL_TARGET}/${PROFILE}/kernel disk/kernel
 # run gazami
 cargo run --bin gazami ${CARGO_PROFILE}
