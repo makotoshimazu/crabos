@@ -67,9 +67,7 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         // ↑↑↑↑↑ mikan book list3.2
         let memory_map_size = system_table.boot_services().memory_map_size().map_size;
         writeln!(system_table.stdout(), "memory map size {}", memory_map_size).unwrap();
-        let mut mmap_buf = [0u8; 100000];
-        // let mmap_buf_aligned = MemoryDescriptor::round_up_to_alignment(mmap_buf.as_mut_slice().as_mut_ptr() as usize);
-        // let offset = MemoryDescriptor::offset_up_to_alignment(mmap_buf.as_mut_slice().as_mut_ptr() as usize);
+        let mut mmap_buf = [0u8; 10000];
         let mut mmap_buf_aligned = MemoryDescriptor::align_buf(&mut mmap_buf).unwrap();
 
         writeln!(
@@ -80,13 +78,10 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         .unwrap();
         writeln!(system_table.stdout(), "{:?}", mmap_buf_aligned.as_ptr()).unwrap();
 
-        // https://doc.rust-lang.org/std/primitive.slice.html#method.align_to_mut
-        // let buffer = from_raw_parts_mut(mmap_buf_aligned as *mut u8, 10000 - offset);
         system_table
             .exit_boot_services(handle, &mut mmap_buf_aligned)
             .unwrap();
         // TODO: Move the instruction pointer to the address stored at (buffer + 24).
+        loop {}
     }
-
-    Status::SUCCESS
 }
