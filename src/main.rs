@@ -39,6 +39,7 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
             }
         };
         let mut file = handle.into_regular_file().unwrap();
+        // TODO: allocate enough memory
         let mut file_info_buffer = [0; 1000];
         let file_info = file.get_info::<FileInfo>(&mut file_info_buffer).unwrap();
 
