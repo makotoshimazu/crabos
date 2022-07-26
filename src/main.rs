@@ -68,7 +68,3 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
 
     Status::SUCCESS
 }
-
-// sudo rm -rf /
-// od -tx8 ./disk/kernel.elf
-// od -tx1 ./disk/kernel.elf
