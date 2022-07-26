@@ -3,9 +3,10 @@
 #![feature(abi_efiapi)]
 use core::fmt::Write;
 use core::slice::from_raw_parts_mut;
+use uefi::data_types::Align;
 use uefi::prelude::*;
 use uefi::proto::media::file::{File, FileAttribute, FileInfo, FileMode};
-use uefi::table::boot::{AllocateType, MemoryType};
+use uefi::table::boot::{AllocateType, MemoryDescriptor, MemoryType};
 use uefi::CStr16;
 
 #[entry]
@@ -27,7 +28,7 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
             CStr16::from_str_with_buf("kernel", &mut kernel_filename_buffer).unwrap();
 
         let handle_result = volume.open(kernel_filename, FileMode::Read, FileAttribute::READ_ONLY);
-        let handle = match handle_result {
+        let file_handle = match handle_result {
             Ok(handle) => handle,
             Err(error) if error.status() == uefi::Status::NOT_FOUND => {
                 writeln!(system_table.stdout(), "file not found.").unwrap();
@@ -38,7 +39,7 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
                 panic!("dame");
             }
         };
-        let mut file = handle.into_regular_file().unwrap();
+        let mut file = file_handle.into_regular_file().unwrap();
         // TODO: allocate enough memory
         let mut file_info_buffer = [0; 1000];
         let file_info = file.get_info::<FileInfo>(&mut file_info_buffer).unwrap();
@@ -64,6 +65,26 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         writeln!(system_table.stdout(), "{:?}", ptr as *const u64).unwrap();
 
         // ↑↑↑↑↑ mikan book list3.2
+        let memory_map_size = system_table.boot_services().memory_map_size().map_size;
+        writeln!(system_table.stdout(), "memory map size {}", memory_map_size).unwrap();
+        let mut mmap_buf = [0u8; 100000];
+        // let mmap_buf_aligned = MemoryDescriptor::round_up_to_alignment(mmap_buf.as_mut_slice().as_mut_ptr() as usize);
+        // let offset = MemoryDescriptor::offset_up_to_alignment(mmap_buf.as_mut_slice().as_mut_ptr() as usize);
+        let mut mmap_buf_aligned = MemoryDescriptor::align_buf(&mut mmap_buf).unwrap();
+
+        writeln!(
+            system_table.stdout(),
+            "align: {:?}",
+            MemoryDescriptor::alignment()
+        )
+        .unwrap();
+        writeln!(system_table.stdout(), "{:?}", mmap_buf_aligned.as_ptr()).unwrap();
+
+        // https://doc.rust-lang.org/std/primitive.slice.html#method.align_to_mut
+        // let buffer = from_raw_parts_mut(mmap_buf_aligned as *mut u8, 10000 - offset);
+        system_table
+            .exit_boot_services(handle, &mut mmap_buf_aligned)
+            .unwrap();
         // TODO: Move the instruction pointer to the address stored at (buffer + 24).
     }
 
