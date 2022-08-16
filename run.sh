@@ -21,3 +21,14 @@ cargo build ${CARGO_PROFILE} --bin kernel --target ${KERNEL_TARGET}
 cp target/${KERNEL_TARGET}/${PROFILE}/kernel disk/kernel
 # run gazami
 cargo run --bin gazami ${CARGO_PROFILE}
+
+# # === Use C++ binary for debug ===
+# # kernel build
+# clang++ -O2 -Wall -g --target=x86_64-elf -ffreestanding -mno-red-zone \
+# -fno-exceptions -fno-rtti -std=c++17 -c src/bin/kernel.cpp
+# ld.lld --entry KernelMain -z norelro --image-base 0x100000 --static -o \
+# kernel.elf kernel.o
+# # copy binary into disk
+# mv kernel.elf disk/kernel
+# # run gazami
+# cargo run --bin gazami ${CARGO_PROFILE}
