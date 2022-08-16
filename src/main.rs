@@ -73,7 +73,7 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         file.read(buffer).unwrap();
 
         // Reference: Mikan book p.79
-        // TODO: Remove the mysterious 0x1000
+        // TODO: Understand this magic...
         let ptr = addr + 0x1e0;
         writeln!(
             system_table.stdout(),
