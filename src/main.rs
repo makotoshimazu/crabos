@@ -1,6 +1,9 @@
 #![no_std]
 #![no_main]
 #![feature(abi_efiapi)]
+
+mod elf;
+
 use core::fmt::Write;
 use core::mem;
 use core::slice::{from_raw_parts, from_raw_parts_mut};
@@ -71,6 +74,8 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
             .unwrap();
         let buffer = from_raw_parts_mut(addr as *mut u8, page_size * PAGE_UNIT_SIZE);
         file.read(buffer).unwrap();
+
+        let elf = elf::Ehdr64::deserialize(buffer, 0).unwrap();
 
         // Reference: Mikan book p.79
         // TODO: Understand this magic...
