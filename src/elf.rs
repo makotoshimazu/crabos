@@ -1,4 +1,5 @@
 use bincode;
+use core::slice::from_raw_parts;
 
 pub type Elf64Half = u16;
 pub type Elf64Word = u32;
@@ -7,7 +8,7 @@ pub type Elf64Addr = u64;
 // File offsets
 pub type Elf64Off = u64;
 
-#[derive(bincode::Decode, bincode::Encode)]
+#[derive(bincode::Decode, bincode::Encode, Debug)]
 #[repr(C)]
 pub struct Ehdr64 {
     pub e_ident: [u8; 16],
@@ -27,20 +28,30 @@ pub struct Ehdr64 {
 }
 
 impl Ehdr64 {
-    pub fn deserialize(buf: &[u8], start: usize) -> Result<Self, bincode::error::DecodeError> {
-        match bincode::decode_from_slice::<Self, _>(&buf[start..], bincode::config::standard()) {
+    pub fn deserialize(addr: u64) -> Result<Self, bincode::error::DecodeError> {
+        let buf = unsafe { from_raw_parts(addr as *const u8, core::mem::size_of::<Self>()) };
+        match bincode::decode_from_slice::<Self, _>(buf, bincode::config::standard()) {
             Ok((header, _)) => Ok(header),
             Err(e) => Err(e),
         }
     }
-
-    pub fn addr_range(&self) -> (u64, u64) {
-        // TODO: 実装する
-        (0, 0)
-    }
 }
 
-#[derive(bincode::Decode, bincode::Encode)]
+pub fn addr_range(buf: &[u8]) -> (u64, u64) {
+    let header = Ehdr64::deserialize(buf.as_ptr() as u64).unwrap();
+    let phdr_addr = (buf.as_ptr() as u64) + header.e_phoff;
+    let phdrs = unsafe { from_raw_parts(phdr_addr as *const Phdr64, header.e_phnum.into()) };
+
+    let mut first = u64::max_value();
+    let mut last = u64::min_value();
+    for phdr in phdrs {
+        first = core::cmp::min(first, phdr.p_vaddr);
+        last = core::cmp::max(last, phdr.p_vaddr + phdr.p_memsz);
+    }
+    (first, last)
+}
+
+#[derive(bincode::Decode, bincode::Encode, Debug)]
 pub struct Phdr64 {
     /// Segment type
     pub p_type: Elf64Word,
@@ -68,8 +79,9 @@ pub struct Phdr64 {
 }
 
 impl Phdr64 {
-    pub fn deserialize(buf: &[u8], start: usize) -> Result<Self, bincode::error::DecodeError> {
-        match bincode::decode_from_slice::<Self, _>(&buf[start..], bincode::config::standard()) {
+    pub fn deserialize(addr: u64) -> Result<Self, bincode::error::DecodeError> {
+        let buf = unsafe { from_raw_parts(addr as *const u8, core::mem::size_of::<Self>()) };
+        match bincode::decode_from_slice::<Self, _>(buf, bincode::config::standard()) {
             Ok((header, _)) => Ok(header),
             Err(e) => Err(e),
         }

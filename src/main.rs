@@ -75,7 +75,12 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         let buffer = from_raw_parts_mut(addr as *mut u8, page_size * PAGE_UNIT_SIZE);
         file.read(buffer).unwrap();
 
-        let elf = elf::Ehdr64::deserialize(buffer, 0).unwrap();
+        writeln!(
+            system_table.stdout(),
+            "range: {:?}",
+            elf::addr_range(buffer)
+        )
+        .unwrap();
 
         // Reference: Mikan book p.79
         // TODO: Understand this magic...
