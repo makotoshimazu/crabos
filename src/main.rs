@@ -53,7 +53,7 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
 
         const PAGE_UNIT_SIZE: usize = 0x1000;
         let kernel_file_size = file_info.file_size() as usize;
-        let page_size = (kernel_file_size + PAGE_UNIT_SIZE - 0x1) / PAGE_UNIT_SIZE;
+        let kernel_file_size_in_pages = size_in_pages(kernel_file_size);
 
         writeln!(
             system_table.stdout(),
@@ -65,18 +65,16 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         // 1. まず一回雑に全部読む
         let kernel_buffer = fs_sytem_table
             .boot_services()
-            .allocate_pool(MemoryType::LOADER_DATA, page_size)
+            .allocate_pool(MemoryType::LOADER_DATA, kernel_file_size_in_pages)
             .unwrap();
-        let buffer = from_raw_parts_mut(kernel_buffer, page_size * PAGE_UNIT_SIZE);
+        let buffer = from_raw_parts_mut(kernel_buffer, kernel_file_size_in_pages * PAGE_UNIT_SIZE);
         file.read(buffer).unwrap();
 
         // 2. ヘッダーをいい感じに読む
-        let mut kernel_first_addr: u64 = 0;
-        let mut kernel_last_addr: u64 = 0;
         let ehdr =
             core::mem::transmute::<*const u64, *const Elf64_Ehdr>(kernel_buffer as *const u64);
 
-        calc_load_address_range(ehdr, &mut kernel_first_addr, &mut kernel_last_addr);
+        let (kernel_first_addr, kernel_last_addr) = calc_load_address_range(ehdr);
         writeln!(
             system_table.stdout(),
             "kernel first addr: {:?}\nkernel last addr: {:?}",
@@ -87,17 +85,22 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
 
         // 3. セクションごとに適切なアドレスにバッファを確保してコピーする
         // TODO: ここ
+        let aligned_kernel_first_addr = align_page(kernel_first_addr as usize);
+        let kernel_addr_size_in_pages =
+            size_in_pages(kernel_last_addr as usize - aligned_kernel_first_addr);
 
         let addr = fs_sytem_table
             .boot_services()
             .allocate_pages(
-                AllocateType::Address(0x100000),
+                AllocateType::Address(aligned_kernel_first_addr),
                 MemoryType::LOADER_DATA,
-                page_size,
+                kernel_addr_size_in_pages,
             )
             .unwrap();
-        let buffer = from_raw_parts_mut(addr as *mut u8, page_size * PAGE_UNIT_SIZE);
-        file.read(buffer).unwrap();
+        let buffer =
+            from_raw_parts_mut(addr as *mut u8, kernel_addr_size_in_pages * PAGE_UNIT_SIZE);
+
+        // TODO: いい感じにセクションごとにコピーする
 
         // Reference: Mikan book p.79
         // TODO: Understand this magic...
@@ -144,6 +147,16 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
 
         Status::SUCCESS
     }
+}
+
+const PAGE_UNIT_SIZE: usize = 0x1000;
+
+fn align_page(addr: usize) -> usize {
+    addr / PAGE_UNIT_SIZE * PAGE_UNIT_SIZE
+}
+
+fn size_in_pages(size_in_bytes: usize) -> usize {
+    (size_in_bytes + PAGE_UNIT_SIZE - 1) / PAGE_UNIT_SIZE
 }
 
 #[allow(unused)]
@@ -213,14 +226,14 @@ pub struct Elf64_Phdr {
 
 const PT_LOAD: Elf64Word = 1;
 
-fn calc_load_address_range(ehdr: *const Elf64_Ehdr, first: &mut u64, last: &mut u64) {
+fn calc_load_address_range(ehdr: *const Elf64_Ehdr) -> (u64, u64) {
     unsafe {
         let phdr_addr = (ehdr as *const u64)
             .add((*ehdr).e_phoff as usize / core::mem::size_of::<Elf64Off>())
             as *const Elf64_Phdr;
         // ここでphdrにいい感じにtransmut
-        *first = u64::MAX;
-        *last = u64::MIN;
+        let mut first = u64::MAX;
+        let mut last = u64::MIN;
 
         for i in 0..(*ehdr).e_phnum {
             // let offset = (i as usize) * core::mem::size_of::<Elf64_Phdr>();
@@ -229,8 +242,9 @@ fn calc_load_address_range(ehdr: *const Elf64_Ehdr, first: &mut u64, last: &mut 
             if (*phdr).p_type != PT_LOAD {
                 continue;
             }
-            *first = cmp::min(*first, (*phdr).p_vaddr);
-            *last = cmp::max(*last, (*phdr).p_vaddr + (*phdr).p_memsz);
+            first = cmp::min(first, (*phdr).p_vaddr);
+            last = cmp::max(last, (*phdr).p_vaddr + (*phdr).p_memsz);
         }
+        (first, last)
     }
 }
