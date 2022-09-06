@@ -4,6 +4,7 @@
 use core::cmp;
 use core::fmt::Write;
 use core::mem;
+use core::ptr::write_bytes;
 use core::slice::{from_raw_parts, from_raw_parts_mut};
 use uefi::data_types::Align;
 use uefi::prelude::*;
@@ -84,7 +85,6 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         .unwrap();
 
         // 3. セクションごとに適切なアドレスにバッファを確保してコピーする
-        // TODO: ここ
         let aligned_kernel_first_addr = align_page(kernel_first_addr as usize);
         let kernel_addr_size_in_pages =
             size_in_pages(kernel_last_addr as usize - aligned_kernel_first_addr);
@@ -99,12 +99,11 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
             .unwrap();
         let buffer =
             from_raw_parts_mut(addr as *mut u8, kernel_addr_size_in_pages * PAGE_UNIT_SIZE);
-
-        // TODO: いい感じにセクションごとにコピーする
+        copy_load_segments(ehdr, buffer);
 
         // Reference: Mikan book p.79
         // TODO: Understand this magic...
-        let ptr = addr + 0x1e0;
+        let ptr = (*ehdr).e_entry;
         writeln!(
             system_table.stdout(),
             "entry point addr: {:?}",
@@ -246,5 +245,30 @@ fn calc_load_address_range(ehdr: *const Elf64_Ehdr) -> (u64, u64) {
             last = cmp::max(last, (*phdr).p_vaddr + (*phdr).p_memsz);
         }
         (first, last)
+    }
+}
+
+unsafe fn copy_load_segments(ehdr: *const Elf64_Ehdr, buffer: &mut [u8]) {
+    let phdr_addr = (ehdr as *const u64)
+        .add((*ehdr).e_phoff as usize / core::mem::size_of::<Elf64Off>())
+        as *const Elf64_Phdr;
+
+    for i in 0..(*ehdr).e_phnum {
+        let phdr = phdr_addr.add(i as usize);
+
+        if (*phdr).p_type != PT_LOAD {
+            continue;
+        }
+
+        let src_addr = ((ehdr as u64) + (*phdr).p_offset) as *const u8;
+        let section_start_index_in_buffer = ((*phdr).p_vaddr - buffer.as_ptr() as u64) as usize;
+        buffer[section_start_index_in_buffer..]
+            .as_mut_ptr()
+            .copy_from(src_addr, (*phdr).p_filesz as usize);
+
+        let remain_bytes = ((*phdr).p_memsz - (*phdr).p_filesz) as usize;
+        let remain_first_addr =
+            buffer[section_start_index_in_buffer + (*phdr).p_filesz as usize..].as_mut_ptr();
+        write_bytes(remain_first_addr, 0, remain_bytes);
     }
 }
