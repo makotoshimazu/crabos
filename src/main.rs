@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(abi_efiapi)]
-use core::cmp;
+
 use core::fmt::Write;
 use core::mem;
 use core::ptr::write_bytes;
@@ -75,7 +75,7 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         let ehdr =
             core::mem::transmute::<*const u64, *const Elf64_Ehdr>(kernel_buffer as *const u64);
 
-        let (kernel_first_addr, kernel_last_addr) = calc_load_address_range(ehdr);
+        let (kernel_first_addr, kernel_last_addr) = calc_load_address_range(ehdr).unwrap();
         writeln!(
             system_table.stdout(),
             "kernel first addr: {:?}\nkernel last addr: {:?}",
@@ -225,50 +225,38 @@ pub struct Elf64_Phdr {
 
 const PT_LOAD: Elf64Word = 1;
 
-fn calc_load_address_range(ehdr: *const Elf64_Ehdr) -> (u64, u64) {
-    unsafe {
-        let phdr_addr = (ehdr as *const u64)
-            .add((*ehdr).e_phoff as usize / core::mem::size_of::<Elf64Off>())
-            as *const Elf64_Phdr;
-        // ここでphdrにいい感じにtransmut
-        let mut first = u64::MAX;
-        let mut last = u64::MIN;
+unsafe fn phdrs<'a>(ehdr: *const Elf64_Ehdr) -> &'a [Elf64_Phdr] {
+    from_raw_parts(
+        (ehdr as *const u8).add((*ehdr).e_phoff as usize) as *const Elf64_Phdr,
+        (*ehdr).e_phnum as _,
+    )
+}
 
-        for i in 0..(*ehdr).e_phnum {
-            // let offset = (i as usize) * core::mem::size_of::<Elf64_Phdr>();
-            let phdr = phdr_addr.add(i as usize);
-
-            if (*phdr).p_type != PT_LOAD {
-                continue;
-            }
-            first = cmp::min(first, (*phdr).p_vaddr);
-            last = cmp::max(last, (*phdr).p_vaddr + (*phdr).p_memsz);
-        }
-        (first, last)
-    }
+unsafe fn calc_load_address_range(ehdr: *const Elf64_Ehdr) -> Option<(u64, u64)> {
+    let loads = phdrs(ehdr).iter().filter(|phdr| phdr.p_type == PT_LOAD);
+    let first = loads.clone().map(|phdr| phdr.p_vaddr).min()?;
+    let last = loads
+        .clone()
+        .map(|phdr| phdr.p_vaddr + phdr.p_memsz)
+        .max()?;
+    Some((first, last))
 }
 
 unsafe fn copy_load_segments(ehdr: *const Elf64_Ehdr, buffer: &mut [u8]) {
-    let phdr_addr = (ehdr as *const u64)
-        .add((*ehdr).e_phoff as usize / core::mem::size_of::<Elf64Off>())
-        as *const Elf64_Phdr;
-
-    for i in 0..(*ehdr).e_phnum {
-        let phdr = phdr_addr.add(i as usize);
-
-        if (*phdr).p_type != PT_LOAD {
+    for phdr in phdrs(ehdr) {
+        if phdr.p_type != PT_LOAD {
             continue;
         }
 
-        let src_addr = ((ehdr as u64) + (*phdr).p_offset) as *const u8;
+        let src_addr = (ehdr as *const u8).add(phdr.p_offset as _);
         let section_start_index_in_buffer = ((*phdr).p_vaddr - buffer.as_ptr() as u64) as usize;
         buffer[section_start_index_in_buffer..]
             .as_mut_ptr()
-            .copy_from(src_addr, (*phdr).p_filesz as usize);
+            .copy_from(src_addr, phdr.p_filesz as usize);
 
-        let remain_bytes = ((*phdr).p_memsz - (*phdr).p_filesz) as usize;
+        let remain_bytes = (phdr.p_memsz - phdr.p_filesz) as usize;
         let remain_first_addr =
-            buffer[section_start_index_in_buffer + (*phdr).p_filesz as usize..].as_mut_ptr();
+            buffer[section_start_index_in_buffer + phdr.p_filesz as usize..].as_mut_ptr();
         write_bytes(remain_first_addr, 0, remain_bytes);
     }
 }
