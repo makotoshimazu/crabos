@@ -122,28 +122,15 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         writeln!(system_table.stdout(), "uefi revision: {}.{}", major, minor).unwrap();
 
         let frame_buffer = {
-            let mut buf = [MaybeUninit::uninit(), MaybeUninit::uninit()];
-            let size = system_table
+            let handle_buffer = system_table
                 .boot_services()
-                .locate_handle(
-                    uefi::table::boot::SearchType::ByProtocol(&GraphicsOutput::GUID),
-                    None,
-                )
+                .locate_handle_buffer(uefi::table::boot::SearchType::ByProtocol(
+                    &GraphicsOutput::GUID,
+                ))
                 .unwrap();
-            if size > 2 {
-                panic!("size is more than the buffer size. {}", size)
-            }
-            system_table
-                .boot_services()
-                .locate_handle(
-                    uefi::table::boot::SearchType::ByProtocol(&GraphicsOutput::GUID),
-                    Some(&mut buf),
-                )
-                .unwrap();
-            let handle = buf[0].assume_init();
             let mut scoped_protocol = system_table
                 .boot_services()
-                .open_protocol_exclusive::<GraphicsOutput>(handle)
+                .open_protocol_exclusive::<GraphicsOutput>(handle_buffer.handles()[0])
                 .unwrap();
             let ptr = scoped_protocol.frame_buffer().as_mut_ptr();
             let size = scoped_protocol.frame_buffer().size();
