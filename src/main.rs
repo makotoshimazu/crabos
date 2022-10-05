@@ -122,18 +122,17 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         writeln!(system_table.stdout(), "uefi revision: {}.{}", major, minor).unwrap();
 
         let frame_buffer = {
-            let handle_buffer = system_table
+            let handle = system_table
                 .boot_services()
-                .locate_handle_buffer(uefi::table::boot::SearchType::ByProtocol(
-                    &GraphicsOutput::GUID,
-                ))
+                .get_handle_for_protocol::<GraphicsOutput>()
                 .unwrap();
             let mut scoped_protocol = system_table
                 .boot_services()
-                .open_protocol_exclusive::<GraphicsOutput>(handle_buffer.handles()[0])
+                .open_protocol_exclusive::<GraphicsOutput>(handle)
                 .unwrap();
             let ptr = scoped_protocol.frame_buffer().as_mut_ptr();
             let size = scoped_protocol.frame_buffer().size();
+
             from_raw_parts_mut(ptr, size)
         };
 
