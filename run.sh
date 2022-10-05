@@ -15,6 +15,10 @@ else
     readonly CARGO_PROFILE="--release"
 fi
 
+if [ ! -d $SCRIPT_DIR/disk ]; then
+    mkdir -p disk
+fi
+
 # kernel build
 cargo build ${CARGO_PROFILE} --bin kernel --target ${KERNEL_TARGET}
 # copy binary into disk
