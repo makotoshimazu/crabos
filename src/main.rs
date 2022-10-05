@@ -3,14 +3,18 @@
 #![feature(abi_efiapi)]
 
 use core::fmt::Write;
-use core::mem;
+use core::mem::{self, MaybeUninit};
 use core::ptr::write_bytes;
 use core::slice::{from_raw_parts, from_raw_parts_mut};
 use uefi::data_types::Align;
-use uefi::prelude::*;
+use uefi::proto::console::gop::GraphicsOutput;
+use uefi::proto::console::serial::Serial;
+use uefi::proto::console::text::Output;
 use uefi::proto::media::file::{File, FileAttribute, FileInfo, FileMode};
-use uefi::table::boot::{AllocateType, MemoryDescriptor, MemoryType};
+use uefi::table::boot::{AllocateType, MemoryDescriptor, MemoryType, ScopedProtocol};
 use uefi::CStr16;
+use uefi::{prelude::*, Identify};
+use uefi_services::system_table;
 
 #[entry]
 fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
@@ -112,6 +116,27 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         .unwrap();
 
         // ↑↑↑↑↑ mikan book list3.2
+
+        let major = system_table.uefi_revision().major();
+        let minor = system_table.uefi_revision().minor();
+        writeln!(system_table.stdout(), "uefi revision: {}.{}", major, minor).unwrap();
+
+        let frame_buffer = {
+            let handle = system_table
+                .boot_services()
+                .get_handle_for_protocol::<GraphicsOutput>()
+                .unwrap();
+            let mut scoped_protocol = system_table
+                .boot_services()
+                .open_protocol_exclusive::<GraphicsOutput>(handle)
+                .unwrap();
+            let ptr = scoped_protocol.frame_buffer().as_mut_ptr();
+            let size = scoped_protocol.frame_buffer().size();
+
+            from_raw_parts_mut(ptr, size)
+        };
+
+        frame_buffer.fill(255);
 
         let memory_map_size = system_table.boot_services().memory_map_size().map_size;
         writeln!(

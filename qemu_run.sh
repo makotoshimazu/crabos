@@ -18,8 +18,8 @@ echo "fs0:$(basename $built_binary_path)" > $DISK_DIR/startup.nsh
 
 qemu-system-x86_64 \
     -nodefaults \
+    -vga std \
     -machine q35,accel=kvm:tcg \
-    -nographic \
     -m 128M \
     -serial stdio \
     -drive if=pflash,format=raw,file=$OVMF_CODE,readonly=on \
