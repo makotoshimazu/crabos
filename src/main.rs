@@ -72,6 +72,7 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
             .boot_services()
             .allocate_pool(MemoryType::LOADER_DATA, kernel_file_size_in_pages)
             .unwrap();
+
         let buffer = from_raw_parts_mut(kernel_buffer, kernel_file_size_in_pages * PAGE_UNIT_SIZE);
         file.read(buffer).unwrap();
 
@@ -121,7 +122,7 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         let minor = system_table.uefi_revision().minor();
         writeln!(system_table.stdout(), "uefi revision: {}.{}", major, minor).unwrap();
 
-        let frame_buffer = {
+        let (frame_buffer_ptr, frame_buffer_size) = {
             let handle = system_table
                 .boot_services()
                 .get_handle_for_protocol::<GraphicsOutput>()
@@ -132,11 +133,19 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
                 .unwrap();
             let ptr = scoped_protocol.frame_buffer().as_mut_ptr();
             let size = scoped_protocol.frame_buffer().size();
-
-            from_raw_parts_mut(ptr, size)
+            (ptr, size)
         };
+        writeln!(
+            system_table.stdout(),
+            "frame buffer size: {}",
+            frame_buffer_size
+        )
+        .unwrap();
 
-        frame_buffer.fill(255);
+        // let frame_buffer = from_raw_parts_mut(frame_buffer_ptr, frame_buffer_size);
+        // for (i, v) in frame_buffer.iter_mut().enumerate() {
+        //     *v = (i % 256) as u8;
+        // }
 
         let memory_map_size = system_table.boot_services().memory_map_size().map_size;
         writeln!(
@@ -166,8 +175,9 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
             .unwrap();
         mem::forget(mmap_buf_aligned);
 
-        let f = core::mem::transmute::<_, extern "C" fn() -> core::ffi::c_void>(ptr);
-        f();
+        let f = core::mem::transmute::<_, extern "C" fn(u64) -> core::ffi::c_void>(ptr);
+        // f(frame_buffer_ptr, frame_buffer_size);
+        f(10000);
 
         Status::SUCCESS
     }
