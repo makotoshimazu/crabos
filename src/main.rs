@@ -175,9 +175,9 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
             .unwrap();
         mem::forget(mmap_buf_aligned);
 
-        let f = core::mem::transmute::<_, extern "C" fn(u64) -> core::ffi::c_void>(ptr);
+        let f = core::mem::transmute::<_, extern "efiapi" fn(u64, u64) -> core::ffi::c_void>(ptr);
         // f(frame_buffer_ptr, frame_buffer_size);
-        f(10000);
+        f(0xdead, 0xbeef);
 
         Status::SUCCESS
     }

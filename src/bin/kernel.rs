@@ -1,17 +1,18 @@
 #![no_std]
 #![no_main]
+#![feature(abi_efiapi)]
 
 use core::arch::asm;
 use core::panic::PanicInfo;
 use core::slice::from_raw_parts_mut;
 
 #[no_mangle]
-pub extern "C" fn kernel_main(my_number: u64) -> ! {
+pub extern "efiapi" fn kernel_main(a: u64, b: u64) -> ! {
     // pub extern "C" fn kernel_main(frame_buffer_base: *mut u8, frame_buffer_size: usize) -> ! {
     // let frame_buffer = (frame_buffer_base as *const u8);
     // let frame_buffer = unsafe { from_raw_parts_mut(frame_buffer_base, frame_buffer_size) };
 
-    if my_number == 10000 {
+    if (a, b) != (0xdead, 0xbeef) {
         panic!();
     }
     // if nakamura != 100 {
