@@ -7,21 +7,13 @@ use core::panic::PanicInfo;
 use core::slice::from_raw_parts_mut;
 
 #[no_mangle]
-pub extern "efiapi" fn kernel_main(a: u64, b: u64) -> ! {
-    // pub extern "C" fn kernel_main(frame_buffer_base: *mut u8, frame_buffer_size: usize) -> ! {
-    // let frame_buffer = (frame_buffer_base as *const u8);
-    // let frame_buffer = unsafe { from_raw_parts_mut(frame_buffer_base, frame_buffer_size) };
+pub extern "efiapi" fn kernel_main(frame_buffer_base: *mut u8, frame_buffer_size: u64) -> ! {
+    let frame_buffer = unsafe { from_raw_parts_mut(frame_buffer_base, frame_buffer_size as usize) };
 
-    if (a, b) != (0xdead, 0xbeef) {
-        panic!();
-    }
-    // if nakamura != 100 {
-    //     panic!();
-    // }
     // こっちの方がRustっぽい
-    // for (i, v) in frame_buffer.iter_mut().enumerate() {
-    //     *v = (i % 256) as u8;
-    // }
+    for (i, v) in frame_buffer.iter_mut().enumerate() {
+        *v = (i % 256) as u8;
+    }
     // method chainするならこう
     // frame_buffer.iter_mut().enumerate().for_each(|(i, v)|)
     // mapだけだとIteratorになるので実行されない (書き換えが起らない)

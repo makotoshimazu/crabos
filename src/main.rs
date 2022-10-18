@@ -142,11 +142,6 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         )
         .unwrap();
 
-        // let frame_buffer = from_raw_parts_mut(frame_buffer_ptr, frame_buffer_size);
-        // for (i, v) in frame_buffer.iter_mut().enumerate() {
-        //     *v = (i % 256) as u8;
-        // }
-
         let memory_map_size = system_table.boot_services().memory_map_size().map_size;
         writeln!(
             system_table.stdout(),
@@ -175,9 +170,8 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
             .unwrap();
         mem::forget(mmap_buf_aligned);
 
-        let f = core::mem::transmute::<_, extern "efiapi" fn(u64, u64) -> core::ffi::c_void>(ptr);
-        // f(frame_buffer_ptr, frame_buffer_size);
-        f(0xdead, 0xbeef);
+        let f = core::mem::transmute::<_, extern "C" fn(*mut u8, u64) -> core::ffi::c_void>(ptr);
+        f(frame_buffer_ptr, frame_buffer_size as u64);
 
         Status::SUCCESS
     }
