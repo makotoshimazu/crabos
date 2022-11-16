@@ -58,7 +58,6 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
 
         const PAGE_UNIT_SIZE: usize = 0x1000;
         let kernel_file_size = file_info.file_size() as usize;
-        let kernel_file_size_in_pages = size_in_pages(kernel_file_size);
 
         writeln!(
             system_table.stdout(),
@@ -70,10 +69,10 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         // 1. まず一回雑に全部読む
         let kernel_buffer = fs_sytem_table
             .boot_services()
-            .allocate_pool(MemoryType::LOADER_DATA, kernel_file_size_in_pages)
+            .allocate_pool(MemoryType::LOADER_DATA, kernel_file_size)
             .unwrap();
 
-        let buffer = from_raw_parts_mut(kernel_buffer, kernel_file_size_in_pages * PAGE_UNIT_SIZE);
+        let buffer = from_raw_parts_mut(kernel_buffer, kernel_file_size);
         // ファイルサイズがでかいとこの行で落ちる
         // X64 Exception Type - 0E(#PF - Page-Fault)  CPU Apic ID - 00000000
         file.read(buffer).unwrap();
