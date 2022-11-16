@@ -73,8 +73,6 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
             .unwrap();
 
         let buffer = from_raw_parts_mut(kernel_buffer, kernel_file_size);
-        // ファイルサイズがでかいとこの行で落ちる
-        // X64 Exception Type - 0E(#PF - Page-Fault)  CPU Apic ID - 00000000
         file.read(buffer).unwrap();
 
         // 2. ヘッダーをいい感じに読む
