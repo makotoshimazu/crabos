@@ -9,12 +9,12 @@ use core::slice::{from_raw_parts, from_raw_parts_mut};
 use uefi::data_types::Align;
 use uefi::proto::console::gop::GraphicsOutput;
 use uefi::proto::console::serial::Serial;
+use uefi::proto::console::text;
 use uefi::proto::console::text::Output;
 use uefi::proto::media::file::{File, FileAttribute, FileInfo, FileMode};
 use uefi::table::boot::{AllocateType, MemoryDescriptor, MemoryType, ScopedProtocol};
 use uefi::CStr16;
 use uefi::{prelude::*, Identify};
-use uefi_services::system_table;
 
 #[entry]
 fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
@@ -103,7 +103,7 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
             .unwrap();
         let buffer =
             from_raw_parts_mut(addr as *mut u8, kernel_addr_size_in_pages * PAGE_UNIT_SIZE);
-        copy_load_segments(ehdr, buffer);
+        copy_load_segments(system_table.stdout(), ehdr, buffer);
 
         // Reference: Mikan book p.79
         // TODO: Understand this magic...
@@ -270,7 +270,7 @@ unsafe fn calc_load_address_range(ehdr: *const Elf64_Ehdr) -> Option<(u64, u64)>
     Some((first, last))
 }
 
-unsafe fn copy_load_segments(ehdr: *const Elf64_Ehdr, buffer: &mut [u8]) {
+unsafe fn copy_load_segments(out: &mut text::Output, ehdr: *const Elf64_Ehdr, buffer: &mut [u8]) {
     for phdr in phdrs(ehdr) {
         if phdr.p_type != PT_LOAD {
             continue;
@@ -282,9 +282,23 @@ unsafe fn copy_load_segments(ehdr: *const Elf64_Ehdr, buffer: &mut [u8]) {
             .as_mut_ptr()
             .copy_from(src_addr, phdr.p_filesz as usize);
 
+        writeln!(
+            out,
+            "PT_LOAD: {:?}, {:>04x}",
+            buffer[section_start_index_in_buffer..].as_mut_ptr() as *const u64,
+            phdr.p_filesz
+        );
+
         let remain_bytes = (phdr.p_memsz - phdr.p_filesz) as usize;
         let remain_first_addr =
             buffer[section_start_index_in_buffer + phdr.p_filesz as usize..].as_mut_ptr();
+
         write_bytes(remain_first_addr, 0, remain_bytes);
+
+        writeln!(
+            out,
+            "write_bytes: {:>08x}, {:>04x} = {:>04x} - {:>04x}",
+            remain_first_addr as usize, remain_bytes, phdr.p_memsz, phdr.p_filesz
+        );
     }
 }
