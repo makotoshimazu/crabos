@@ -96,7 +96,7 @@ fn main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         let addr = fs_sytem_table
             .boot_services()
             .allocate_pages(
-                AllocateType::Address(aligned_kernel_first_addr),
+                AllocateType::Address(aligned_kernel_first_addr as u64),
                 MemoryType::LOADER_DATA,
                 kernel_addr_size_in_pages,
             )
